@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Audio Denoiser</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* Light slate background */
+        }
+        .container-card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        /* Custom animation for the button */
+        .denoise-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(49, 130, 206, 0.4);
+        }
+        .denoise-button:active {
+            transform: translateY(0);
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="container-card bg-white p-8 rounded-xl w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-6">
+            <span class="text-indigo-600">AI</span> Audio Denoiser
+        </h1>
+        <p class="text-center text-gray-600 mb-8">
+            Upload a noisy audio file and let the AI process it for a cleaner sound.
+        </p>
+
+        <!-- Flash Messages Display -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="mb-4">
+                {% for category, message in messages %}
+                    <div class="p-3 rounded-lg text-sm mb-2 
+                        {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}" 
+                        role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Upload Form -->
+        <form id="uploadForm" action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
+            
+            <label for="audioFile" class="block text-lg font-medium text-gray-700">Select Audio File:</label>
+            <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md transition duration-300 ease-in-out hover:border-indigo-500">
+                <div class="space-y-1 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-8m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m-4-4v4m-12 0v4m0-4h.01" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <div class="flex text-sm text-gray-600">
+                        <label for="audioFile" class="relative cursor-pointer bg-white rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                            <span>Upload a file</span>
+                            <input id="audioFile" name="audioFile" type="file" class="sr-only" accept=".wav, .mp3, .flac, .ogg" required>
+                        </label>
+                        <p class="pl-1">or drag and drop</p>
+                    </div>
+                    <p class="text-xs text-gray-500" id="file-name-display">
+                        MP3, WAV, FLAC, OGG up to 20MB
+                    </p>
+                </div>
+            </div>
+
+            <button type="submit" 
+                    id="submitButton"
+                    class="denoise-button w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-base font-medium text-white bg-indigo-600 transition duration-150 ease-in-out hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    disabled>
+                <span id="buttonText">Select Audio to Enable Denoise</span>
+                <div id="loadingSpinner" class="loading-spinner ml-3 hidden"></div>
+            </button>
+        </form>
+
+        <!-- Results Section (Conditionally rendered by Flask) -->
+        {% if noisy_file and denoised_file %}
+            <div class="mt-10 pt-6 border-t border-gray-200">
+                <h2 class="text-2xl font-bold text-indigo-600 mb-4 text-center">Denoising Complete!</h2>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Original Audio -->
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            Original Noisy Audio
+                        </h3>
+                        <!-- The URL needs to point to the Flask endpoint that serves the file -->
+                        <audio controls class="w-full">
+                            <source src="{{ url_for('uploaded_file', filename=noisy_file) }}" type="audio/{{ noisy_file.split('.')[-1] }}">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <p class="text-xs text-gray-500 mt-2 text-center break-all">{{ noisy_file }}</p>
+                    </div>
+
+                    <!-- Denoised Audio -->
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            AI Denoised Audio
+                        </h3>
+                        <audio controls class="w-full">
+                            <source src="{{ url_for('uploaded_file', filename=denoised_file) }}" type="audio/{{ denoised_file.split('.')[-1] }}">
+                            Your browser does not support the audio element.
+                        </audio>
+                         <p class="text-xs text-gray-500 mt-2 text-center break-all">{{ denoised_file }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-center">
+                    <a href="{{ url_for('index') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-indigo-600 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150">
+                        Process Another File
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('audioFile');
+            const submitButton = document.getElementById('submitButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const uploadForm = document.getElementById('uploadForm');
+            const fileNameDisplay = document.getElementById('file-name-display');
+
+            // --- 1. Enable/Disable Submit Button based on file selection ---
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    submitButton.disabled = false;
+                    buttonText.textContent = 'Denoise Audio!';
+                    submitButton.classList.remove('bg-gray-400', 'hover:bg-gray-500');
+                    submitButton.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                    fileNameDisplay.textContent = fileInput.files[0].name;
+                } else {
+                    submitButton.disabled = true;
+                    buttonText.textContent = 'Select Audio to Enable Denoise';
+                    submitButton.classList.add('bg-gray-400', 'hover:bg-gray-500');
+                    submitButton.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                    fileNameDisplay.textContent = 'MP3, WAV, FLAC, OGG up to 20MB';
+                }
+            });
+
+            // --- 2. Handle form submission and loading state ---
+            uploadForm.addEventListener('submit', function() {
+                // Prevent double submission
+                if (submitButton.disabled) {
+                    return;
+                }
+                
+                // Show loading state
+                submitButton.disabled = true;
+                buttonText.textContent = 'Processing... This may take a moment.';
+                loadingSpinner.classList.remove('hidden');
+                submitButton.classList.add('bg-gray-500', 'cursor-not-allowed');
+                submitButton.classList.remove('hover:bg-indigo-700');
+            });
+            
+            // Initial state setup
+            submitButton.classList.add('bg-gray-400', 'hover:bg-gray-500');
+        });
+    </script>
+
+</body>
+</html>
